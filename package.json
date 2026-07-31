@@ -1,0 +1,30 @@
+{
+  "name": "job-application-portal-api",
+  "version": "1.0.0",
+  "description": "RESTful API for candidate registration, resume uploads, and job applications",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "seed": "node src/seed.js",
+    "test": "node --test",
+    "lint": "eslint .",
+    "validate": "npm run lint && npm test"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.17.1",
+    "multer": "^2.0.2"
+  },
+  "devDependencies": {
+    "eslint": "^9.32.0",
+    "globals": "^16.3.0",
+    "mongodb-memory-server": "^10.2.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
+  }
+}
