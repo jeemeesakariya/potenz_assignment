@@ -40,16 +40,27 @@ A RESTful Node.js API where candidates can create an account, upload a resume, b
 
 The API defaults to `http://localhost:3000`. Run `npm start` in production and `npm test` for the automated smoke tests.
 
+## Interactive API documentation
+
+After starting the server, open:
+
+- Swagger UI: `http://localhost:3000/api-docs`
+- Raw OpenAPI JSON: `http://localhost:3000/api-docs.json`
+
+Use the **Authorize** button in Swagger UI and paste the JWT returned by registration or login. Swagger then sends the bearer token to protected endpoints. Resume uploads can also be tested directly from the page.
+
 ## Environment variables
 
 | Key | Required | Description |
 |---|---:|---|
 | `PORT` | No | HTTP port; defaults to `3000` |
+| `NODE_ENV` | No | Use `production` on a deployed server |
 | `MONGODB_URI` | Yes in production | MongoDB connection string |
 | `JWT_SECRET` | Yes in production | Secret used to sign JWTs; use at least 32 random characters |
 | `JWT_EXPIRES_IN` | No | Token lifetime; defaults to `7d` |
 | `MAX_RESUME_SIZE_MB` | No | Maximum resume size; defaults to `5` |
 | `UPLOAD_DIR` | No | Resume storage directory; defaults to `uploads/resumes` |
+| `CORS_ORIGIN` | No | Allowed frontend origin; comma-separated values are supported, defaults to `*` |
 
 `.env.example` contains a complete development template. Uploaded files and `.env` are intentionally excluded from Git.
 
@@ -246,6 +257,36 @@ Response `200`:
 
 `GET /api/applications/:id` returns one application owned by the authenticated candidate. A user cannot view another user's application.
 
+## Deployment
+
+The application is ready for a Node.js host or a container platform. A deployment needs:
+
+- Node.js 20 or newer
+- A MongoDB connection string, such as MongoDB Atlas
+- `NODE_ENV=production`
+- A unique `JWT_SECRET` containing at least 32 characters
+- A persistent disk mounted for `UPLOAD_DIR` if resumes must survive restarts
+
+The server listens on `0.0.0.0` and honors the platform-provided `PORT`. It handles `SIGTERM`/`SIGINT` for graceful shutdown. Use `/health` as the liveness endpoint and `/ready` as the readiness endpoint; readiness returns `503` until MongoDB is connected.
+
+### Deploy with Docker
+
+Build and run locally:
+
+```bash
+docker build -t job-portal-api .
+docker run --rm -p 3000:3000 \
+  -e MONGODB_URI="mongodb+srv://..." \
+  -e JWT_SECRET="replace-with-at-least-32-random-characters" \
+  -e CORS_ORIGIN="https://your-frontend.example" \
+  -v job-portal-uploads:/app/uploads \
+  job-portal-api
+```
+
+Run `npm run seed` once against the production database to insert the sample jobs. Do not commit the production `.env` file.
+
+> Many cloud services use an ephemeral filesystem. Without a persistent disk, uploaded resumes disappear during redeployment. For a larger production system, replace local Multer disk storage with private object storage.
+
 ## Project structure
 
 ```text
@@ -255,10 +296,12 @@ src/
   routes/           REST endpoint handlers
   app.js            Express configuration
   config.js         Environment configuration
+  docs/openapi.js   Swagger/OpenAPI specification
   sampleJobs.js     Seed data
   seed.js           Idempotent job seeder
   server.js         Database connection and HTTP listener
 test/               Node test runner tests
+Dockerfile          Production container image
 ```
 
 ## Notes for production
