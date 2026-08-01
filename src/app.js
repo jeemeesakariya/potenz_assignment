@@ -40,7 +40,14 @@ app.use('/api/applications', applicationRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 app.use((error, _req, res, _next) => {
-  if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+  if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
+    return res.status(400).json({ error: 'Request body contains invalid JSON' });
+  }
+  if (error.statusCode) {
+    const response = { error: error.message };
+    if (error.details) response.details = error.details;
+    return res.status(error.statusCode).json(response);
+  }
   if (error instanceof multer.MulterError) {
     const message = error.code === 'LIMIT_FILE_SIZE' ? 'Resume exceeds the configured size limit' : error.message;
     return res.status(400).json({ error: message });
@@ -48,7 +55,10 @@ app.use((error, _req, res, _next) => {
   if (error.message === 'Resume must be a PDF, DOC, or DOCX file') {
     return res.status(400).json({ error: error.message });
   }
-  if (error.name === 'ValidationError') return res.status(400).json({ error: error.message });
+  if (error.name === 'ValidationError') {
+    const details = Object.values(error.errors).map((item) => ({ field: item.path, message: item.message }));
+    return res.status(400).json({ error: 'Database validation failed', details });
+  }
   console.error(error);
   res.status(500).json({ error: 'Internal server error' });
 });

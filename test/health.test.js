@@ -33,5 +33,30 @@ test('GET /ready reports unavailable without a database connection', async () =>
 
 test('job listing rejects pagination that could create an unbounded response', async () => {
   const response = await request(app).get('/api/jobs?limit=101').expect(400);
-  assert.equal(response.body.error, 'limit must be an integer between 1 and 100');
+  assert.equal(response.body.error, 'Please correct the invalid request data');
+  assert.deepEqual(response.body.details[0], { field: 'limit', message: 'limit cannot exceed 100' });
+});
+
+test('registration returns all user-friendly field validation errors', async () => {
+  const response = await request(app)
+    .post('/api/auth/register')
+    .send({ name: 'A', email: 'not-an-email', password: 'short', unexpected: true })
+    .expect(400);
+
+  assert.equal(response.body.error, 'Please correct the invalid request data');
+  assert.deepEqual(response.body.details.map((detail) => detail.field), ['name', 'email', 'password', 'unexpected']);
+});
+
+test('invalid resource IDs are rejected before database access', async () => {
+  const response = await request(app).get('/api/jobs/not-an-id').expect(400);
+  assert.deepEqual(response.body.details[0], { field: 'id', message: 'id must be a valid MongoDB ID' });
+});
+
+test('malformed JSON receives a safe client error', async () => {
+  const response = await request(app)
+    .post('/api/auth/login')
+    .set('Content-Type', 'application/json')
+    .send('{"email":')
+    .expect(400);
+  assert.equal(response.body.error, 'Request body contains invalid JSON');
 });

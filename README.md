@@ -302,6 +302,7 @@ src/
   routes/           Express endpoint declarations
   services/         Validation and business logic
   utils/            Shared errors and async helpers
+  validators/       Joi schemas for bodies, params, and queries
   app.js            Express configuration
   config.js         Environment configuration
   docs/openapi.js   Swagger/OpenAPI specification
