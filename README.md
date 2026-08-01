@@ -1,6 +1,27 @@
 # Job Application Portal API
 
-A RESTful Node.js API where candidates can create an account, upload a resume, browse sample jobs, apply once per job, and track their applications.
+A modular REST API where candidates can register, upload a resume, browse jobs, apply once per job, and track their applications.
+
+## Live deployment
+
+- API: [https://potenz-assignment.onrender.com](https://potenz-assignment.onrender.com)
+- Swagger UI: [https://potenz-assignment.onrender.com/api-docs](https://potenz-assignment.onrender.com/api-docs)
+- Health: [https://potenz-assignment.onrender.com/health](https://potenz-assignment.onrender.com/health)
+- Readiness: [https://potenz-assignment.onrender.com/ready](https://potenz-assignment.onrender.com/ready)
+
+The API is hosted on Render Free, so the first request after inactivity can take about one minute while the service wakes up.
+
+## Main features
+
+- Candidate registration and login with bcrypt password hashing and JWT authentication
+- Joi schemas with friendly field-level validation errors
+- PDF, DOC, and DOCX resume upload with configurable size limits
+- Paginated job and application listings with a maximum page size of 100
+- One application per candidate and job
+- Resume snapshots stored with applications
+- 200 deterministic demo jobs, seeded efficiently with bulk upserts
+- Swagger/OpenAPI documentation and an import-ready production Postman collection
+- Health/readiness endpoints, graceful shutdown, Docker support, and production environment checks
 
 ## Technology
 
@@ -8,14 +29,25 @@ A RESTful Node.js API where candidates can create an account, upload a resume, b
 - MongoDB with Mongoose
 - JWT bearer authentication and bcrypt password hashing
 - Multer resume uploads (PDF, DOC, and DOCX; 5 MB by default)
+- Joi request validation
+- Swagger/OpenAPI and Postman
+- Docker and Render deployment
 
-## Setup
+## Architecture
+
+```text
+Request → Route → Validation/Auth middleware → Controller → Service → Repository → Mongoose → MongoDB
+```
+
+Routes only declare endpoints, controllers handle HTTP concerns, services contain business rules, and repositories own database access. This separation keeps the API easier to test and extend.
+
+## Local setup
 
 1. Install Node.js 20+ and start a local MongoDB instance (or create a MongoDB Atlas database).
 2. Clone the repository and install packages:
 
    ```bash
-   npm install
+   npm ci
    ```
 
 3. Copy `.env.example` to `.env` and change `JWT_SECRET` to a long, random value:
@@ -38,7 +70,7 @@ A RESTful Node.js API where candidates can create an account, upload a resume, b
    npm run dev
    ```
 
-The API defaults to `http://localhost:3000`. Run `npm start` in production and `npm test` for the automated smoke tests.
+The API defaults to `http://localhost:3000`. The seed command synchronizes 200 jobs without creating duplicates; 188 are active and visible through the public API.
 
 ## Interactive API documentation
 
@@ -48,6 +80,15 @@ After starting the server, open:
 - Raw OpenAPI JSON: `http://localhost:3000/api-docs.json`
 
 Use the **Authorize** button in Swagger UI and paste the JWT returned by registration or login. Swagger then sends the bearer token to protected endpoints. Resume uploads can also be tested directly from the page.
+
+## Postman collection
+
+Import these files into Postman:
+
+1. [`01/Potenz-Job-Portal-API.postman_collection.json`](01/Potenz-Job-Portal-API.postman_collection.json)
+2. [`01/Potenz-Job-Portal-Production.postman_environment.json`](01/Potenz-Job-Portal-Production.postman_environment.json)
+
+Select **Potenz Job Portal - Production**, then run the numbered folders in order. Registration automatically creates a unique email and saves the JWT; listing jobs saves a `jobId`; submitting an application saves its `applicationId`. Select a local resume file manually in the upload request. See [`01/README.md`](01/README.md) for the short instructions.
 
 ## Environment variables
 
@@ -72,7 +113,19 @@ Protected endpoints require the token returned by register or login:
 Authorization: Bearer <token>
 ```
 
-All errors use the form `{ "error": "Description" }`. Passwords must contain at least 8 characters.
+Passwords must contain between 8 and 72 characters. Invalid input returns all detected field errors in one response:
+
+```json
+{
+  "error": "Please correct the invalid request data",
+  "details": [
+    { "field": "email", "message": "email must be a valid email address" },
+    { "field": "password", "message": "password must contain at least 8 characters" }
+  ]
+}
+```
+
+Authentication, conflict, and missing-resource errors use `{ "error": "Description" }` with the appropriate HTTP status.
 
 ## API endpoints
 
@@ -153,7 +206,7 @@ Response `200`:
 
 ```json
 {
-  "count": 3,
+  "count": 20,
   "jobs": [
     {
       "_id": "66a77c2406f42b59ae182222",
@@ -164,7 +217,13 @@ Response `200`:
       "employmentType": "Full-time",
       "isActive": true
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 188,
+    "totalPages": 10
+  }
 }
 ```
 
@@ -255,13 +314,55 @@ Response `200`:
       "status": "submitted",
       "createdAt": "2026-08-01T10:05:00.000Z"
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+  }
 }
 ```
 
 `GET /api/applications/:id` returns one application owned by the authenticated candidate. A user cannot view another user's application.
 
+## Useful commands
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start locally with automatic restart |
+| `npm start` | Start normally |
+| `npm run seed` | Idempotently synchronize 200 demo jobs |
+| `npm test` | Run Node.js API tests |
+| `npm run lint` | Run ESLint |
+| `npm run validate` | Run lint and tests |
+
 ## Deployment
+
+The current production API is deployed from the `main` branch to Render using the repository's `Dockerfile`. Render automatically rebuilds and deploys after a new commit is pushed.
+
+Current production configuration:
+
+```text
+Provider: Render Free
+Runtime: Docker
+Database: MongoDB Atlas
+Health check: /health
+Production URL: https://potenz-assignment.onrender.com
+```
+
+Required Render environment variables:
+
+```env
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=at-least-32-random-characters
+JWT_EXPIRES_IN=7d
+MAX_RESUME_SIZE_MB=5
+UPLOAD_DIR=/app/uploads/resumes
+CORS_ORIGIN=*
+```
+
+Do not commit secrets or the production `.env` file. For a real frontend, replace `CORS_ORIGIN=*` with its exact HTTPS origin.
 
 The application is ready for a Node.js host or a container platform. A deployment needs:
 
@@ -289,11 +390,12 @@ docker run --rm -p 3000:3000 \
 
 Run `npm run seed` to bulk-synchronize 200 deterministic, realistic demo jobs. The operation is idempotent, so it can be rerun safely without creating duplicates. Do not commit the production `.env` file.
 
-> Many cloud services use an ephemeral filesystem. Without a persistent disk, uploaded resumes disappear during redeployment. For a larger production system, replace local Multer disk storage with private object storage.
+> **Temporary resume storage:** Render Free has an ephemeral filesystem. Resume files can disappear when the service sleeps, restarts, or redeploys, although their MongoDB metadata remains. This is acceptable for the assignment demo. Migrate the resume service to private object storage before using real candidate data.
 
 ## Project structure
 
 ```text
+01/                 Import-ready Postman collection and environment
 src/
   controllers/      HTTP request and response handling
   middleware/       JWT and upload middleware
@@ -311,8 +413,9 @@ src/
   server.js         Database connection and HTTP listener
 test/               Node test runner tests
 Dockerfile          Production container image
+.env.example        Safe environment-variable template
 ```
 
 ## Notes for production
 
-The included disk storage is suitable for this assignment and a single server. For a distributed production deployment, store resumes in private object storage (such as S3), validate file contents in addition to MIME type, scan uploads for malware, enforce HTTPS, rotate JWT secrets, and add rate limiting and logging.
+The included disk storage is suitable only for this assignment and temporary testing. Before handling real candidate data, use private object storage, validate file signatures in addition to MIME types, scan uploads for malware, restrict CORS, add rate limiting and structured logging, rotate secrets, and establish retention/deletion policies for personal data.
