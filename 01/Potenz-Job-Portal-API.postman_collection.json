@@ -1,0 +1,181 @@
+{
+  "info": {
+    "_postman_id": "adfe9170-6ee4-4626-9194-f1c48a2e7239",
+    "name": "Potenz Job Portal API",
+    "description": "Production-ready requests for the Potenz Job Portal API. Select the Potenz Job Portal - Production environment before running requests. Registration automatically creates a unique candidate and saves the JWT. List Jobs saves a job ID. Upload Resume requires selecting a local PDF, DOC, or DOCX file.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Response completes within the free-host timeout', function () {",
+          "  pm.expect(pm.response.responseTime).to.be.below(90000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "https://potenz-assignment.onrender.com" },
+    { "key": "token", "value": "" },
+    { "key": "candidateEmail", "value": "" },
+    { "key": "candidatePassword", "value": "Postman@12345" },
+    { "key": "jobId", "value": "" },
+    { "key": "applicationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - System",
+      "item": [
+        {
+          "name": "API Information",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/", "description": "Returns service links." },
+          "response": []
+        },
+        {
+          "name": "Health Check",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/health" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Service is healthy', () => {", "  pm.response.to.have.status(200);", "  pm.expect(pm.response.json().status).to.eql('ok');", "});"] } }],
+          "response": []
+        },
+        {
+          "name": "Readiness Check",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/ready" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('API and database are ready', () => {", "  pm.response.to.have.status(200);", "  pm.expect(pm.response.json()).to.include({ status: 'ready', database: 'connected' });", "});"] } }],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Authentication",
+      "item": [
+        {
+          "name": "Register Candidate",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["const email = `postman.candidate.${Date.now()}@example.com`;", "pm.environment.set('candidateEmail', email);", "if (!pm.environment.get('candidatePassword')) pm.environment.set('candidatePassword', 'Postman@12345');"] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Candidate is registered', () => pm.response.to.have.status(201));", "const body = pm.response.json();", "pm.expect(body).to.have.property('token');", "pm.expect(body.user.email).to.eql(pm.environment.get('candidateEmail'));", "pm.environment.set('token', body.token);"] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Candidate\",\n  \"email\": \"{{candidateEmail}}\",\n  \"password\": \"{{candidatePassword}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/register"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Login succeeds', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.expect(body).to.have.property('token');", "pm.environment.set('token', body.token);"] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{candidateEmail}}\",\n  \"password\": \"{{candidatePassword}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "response": []
+        },
+        {
+          "name": "Current Candidate",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/me" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Authenticated profile is returned', () => {", "  pm.response.to.have.status(200);", "  pm.expect(pm.response.json().user.email).to.eql(pm.environment.get('candidateEmail'));", "});"] } }],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Jobs",
+      "item": [
+        {
+          "name": "List Active Jobs",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": { "raw": "{{baseUrl}}/api/jobs?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["api", "jobs"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }] } },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Paginated jobs are returned', () => {", "  pm.response.to.have.status(200);", "  const body = pm.response.json();", "  pm.expect(body.jobs).to.be.an('array').that.is.not.empty;", "  pm.expect(body.pagination.total).to.be.above(0);", "  pm.environment.set('jobId', body.jobs[0]._id);", "});"] } }],
+          "response": []
+        },
+        {
+          "name": "Get Job By ID",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/jobs/{{jobId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Selected job is returned', () => {", "  pm.response.to.have.status(200);", "  pm.expect(pm.response.json().job._id).to.eql(pm.environment.get('jobId'));", "});"] } }],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Resumes",
+      "item": [
+        {
+          "name": "Upload Resume - Select File First",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "formdata", "formdata": [{ "key": "resume", "description": "Select a PDF, DOC, or DOCX file (maximum 5 MB).", "type": "file", "src": "" }] },
+            "url": "{{baseUrl}}/api/resumes",
+            "description": "Before sending, open Body > form-data and select a local resume file. Render Free stores it temporarily until the service sleeps or redeploys."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Resume is uploaded', () => pm.response.to.have.status(201));", "pm.expect(pm.response.json()).to.have.property('resume');"] } }],
+          "response": []
+        },
+        {
+          "name": "Download Resume",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/resumes/download", "description": "Use Send and Download in Postman to save the file." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Resume download succeeds', () => pm.response.to.have.status(200));"] } }],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Applications",
+      "item": [
+        {
+          "name": "Submit Application",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"coverLetter\": \"I am excited to apply for this position. My experience building reliable APIs and collaborating with product teams aligns well with the role.\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/applications",
+            "description": "Upload a resume before sending this request."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Application is submitted', () => pm.response.to.have.status(201));", "const body = pm.response.json();", "pm.environment.set('applicationId', body.application._id);"] } }],
+          "response": []
+        },
+        {
+          "name": "List My Applications",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/applications?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["api", "applications"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }] } },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Applications are paginated', () => {", "  pm.response.to.have.status(200);", "  pm.expect(pm.response.json().applications).to.be.an('array');", "});"] } }],
+          "response": []
+        },
+        {
+          "name": "Get Application By ID",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/applications/{{applicationId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Selected application is returned', () => {", "  pm.response.to.have.status(200);", "  pm.expect(pm.response.json().application._id).to.eql(pm.environment.get('applicationId'));", "});"] } }],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Validation Examples",
+      "item": [
+        {
+          "name": "Invalid Registration",
+          "request": { "auth": { "type": "noauth" }, "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"A\",\n  \"email\": \"invalid-email\",\n  \"password\": \"short\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/register" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Friendly validation errors are returned', () => {", "  pm.response.to.have.status(400);", "  const body = pm.response.json();", "  pm.expect(body.error).to.eql('Please correct the invalid request data');", "  pm.expect(body.details).to.be.an('array').that.is.not.empty;", "});"] } }],
+          "response": []
+        },
+        {
+          "name": "Unauthenticated Profile",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{baseUrl}}/api/auth/me" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Authentication is required', () => {", "  pm.response.to.have.status(401);", "  pm.expect(pm.response.json().error).to.eql('Authentication required');", "});"] } }],
+          "response": []
+        }
+      ]
+    }
+  ]
+}
