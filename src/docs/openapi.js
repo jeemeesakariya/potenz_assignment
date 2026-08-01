@@ -30,6 +30,15 @@ module.exports = {
         required: ['error'],
         properties: { error: { type: 'string', example: 'Description of the error' } },
       },
+      Pagination: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', example: 1 },
+          limit: { type: 'integer', example: 20 },
+          total: { type: 'integer', example: 188 },
+          totalPages: { type: 'integer', example: 10 },
+        },
+      },
       Resume: {
         type: 'object',
         properties: {
@@ -157,9 +166,14 @@ module.exports = {
     '/api/jobs': {
       get: {
         tags: ['Jobs'], summary: 'List active jobs',
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+        ],
         responses: { 200: { description: 'Active jobs', content: { 'application/json': { schema: {
           type: 'object', properties: {
             count: { type: 'integer' }, jobs: { type: 'array', items: { $ref: '#/components/schemas/Job' } },
+            pagination: { $ref: '#/components/schemas/Pagination' },
           },
         } } } } },
       },
@@ -226,10 +240,15 @@ module.exports = {
       },
       get: {
         tags: ['Applications'], summary: 'List my applications', security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+        ],
         responses: {
           200: { description: 'Candidate applications', content: { 'application/json': { schema: {
             type: 'object', properties: {
               count: { type: 'integer' }, applications: { type: 'array', items: { $ref: '#/components/schemas/Application' } },
+              pagination: { $ref: '#/components/schemas/Pagination' },
             },
           } } } },
           401: errorResponse('Authentication required'),

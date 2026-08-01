@@ -40,6 +40,7 @@ app.use('/api/applications', applicationRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 app.use((error, _req, res, _next) => {
+  if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
   if (error instanceof multer.MulterError) {
     const message = error.code === 'LIMIT_FILE_SIZE' ? 'Resume exceeds the configured size limit' : error.message;
     return res.status(400).json({ error: message });

@@ -30,3 +30,8 @@ test('GET /ready reports unavailable without a database connection', async () =>
   const response = await request(app).get('/ready').expect(503);
   assert.equal(response.body.status, 'not_ready');
 });
+
+test('job listing rejects pagination that could create an unbounded response', async () => {
+  const response = await request(app).get('/api/jobs?limit=101').expect(400);
+  assert.equal(response.body.error, 'limit must be an integer between 1 and 100');
+});

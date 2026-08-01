@@ -147,6 +147,8 @@ Response `200`:
 
 `GET /api/jobs`
 
+The list is paginated for predictable performance. Use `?page=1&limit=20`; `limit` can be at most 100.
+
 Response `200`:
 
 ```json
@@ -236,6 +238,8 @@ Duplicate applications return `409`.
 
 `GET /api/applications` — protected
 
+This endpoint accepts the same `page` and `limit` query parameters.
+
 Response `200`:
 
 ```json
@@ -283,7 +287,7 @@ docker run --rm -p 3000:3000 \
   job-portal-api
 ```
 
-Run `npm run seed` once against the production database to insert the sample jobs. Do not commit the production `.env` file.
+Run `npm run seed` to bulk-synchronize 200 deterministic, realistic demo jobs. The operation is idempotent, so it can be rerun safely without creating duplicates. Do not commit the production `.env` file.
 
 > Many cloud services use an ephemeral filesystem. Without a persistent disk, uploaded resumes disappear during redeployment. For a larger production system, replace local Multer disk storage with private object storage.
 
@@ -291,9 +295,13 @@ Run `npm run seed` once against the production database to insert the sample job
 
 ```text
 src/
+  controllers/      HTTP request and response handling
   middleware/       JWT and upload middleware
   models/           Mongoose models
-  routes/           REST endpoint handlers
+  repositories/     Database queries and persistence
+  routes/           Express endpoint declarations
+  services/         Validation and business logic
+  utils/            Shared errors and async helpers
   app.js            Express configuration
   config.js         Environment configuration
   docs/openapi.js   Swagger/OpenAPI specification

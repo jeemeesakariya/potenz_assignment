@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const User = require('../models/User');
+const userRepository = require('../repositories/userRepository');
 
 module.exports = async function auth(req, res, next) {
   try {
@@ -11,7 +11,7 @@ module.exports = async function auth(req, res, next) {
     }
 
     const payload = jwt.verify(token, config.jwtSecret);
-    const user = await User.findById(payload.sub);
+    const user = await userRepository.findById(payload.sub);
     if (!user) return res.status(401).json({ error: 'Invalid authentication token' });
     req.user = user;
     next();

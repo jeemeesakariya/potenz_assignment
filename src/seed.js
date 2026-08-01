@@ -5,15 +5,19 @@ const sampleJobs = require('./sampleJobs');
 
 async function seed() {
   await mongoose.connect(config.mongoUri);
-  for (const job of sampleJobs) {
-    await Job.findOneAndUpdate(
-      { title: job.title, company: job.company },
-      { $setOnInsert: job },
-      { upsert: true, new: true }
-    );
+  try {
+    const operations = sampleJobs.map((job) => ({
+      updateOne: {
+        filter: { seedKey: job.seedKey },
+        update: { $set: job },
+        upsert: true,
+      },
+    }));
+    const result = await Job.bulkWrite(operations, { ordered: false });
+    console.log(`${sampleJobs.length} demo jobs synchronized (${result.upsertedCount} inserted, ${result.modifiedCount} updated).`);
+  } finally {
+    await mongoose.disconnect();
   }
-  console.log(`${sampleJobs.length} sample jobs are available.`);
-  await mongoose.disconnect();
 }
 
 seed().catch((error) => {
